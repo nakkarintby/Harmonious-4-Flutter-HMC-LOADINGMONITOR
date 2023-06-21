@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:hmc_iload/class/listdo.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:flutter/services.dart';
@@ -84,14 +85,18 @@ class _TakephotoState extends State<Takephoto> {
   int min = 0;
   int max = 0;
   int numberupload = 0;
+  double scaleImg = 0;
 
   late List<FocusNode> focusNodes = List.generate(1, (index) => FocusNode());
   bool haveImageSubWorkType = false;
 
+  List<ListDo> listDO = [];
+  String tmpTicketNo = '';
+
   @override
   void initState() {
     super.initState();
-    getLocation();
+    //getLocation();
     getDeviceInfo();
     setState(() {
       step = 1;
@@ -127,10 +132,6 @@ class _TakephotoState extends State<Takephoto> {
     }
 
     _currentPosition = await location.getLocation();
-    /*print('' +
-        _currentPosition!.latitude.toString() +
-        ',' +
-        _currentPosition!.longitude.toString());*/
     setState(() {
       gps = (_currentPosition!.latitude.toString() +
           ',' +
@@ -157,27 +158,6 @@ class _TakephotoState extends State<Takephoto> {
         deviceInfo = androidInfo.manufacturer + '(' + androidInfo.model + ')';
       });
     }
-  }
-
-  Future<void> showProgressImageFromCamera() async {
-    ProgressDialog pr = ProgressDialog(context);
-    pr = ProgressDialog(context,
-        type: ProgressDialogType.normal, isDismissible: true, showLogs: true);
-    pr.style(
-        progress: 50.0,
-        message: "Please wait...",
-        progressWidget: Container(
-            padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()),
-        maxProgress: 100.0,
-        progressTextStyle: TextStyle(
-            color: Colors.black, fontSize: 13.0, fontWeight: FontWeight.w400),
-        messageTextStyle: TextStyle(
-            color: Colors.black, fontSize: 19.0, fontWeight: FontWeight.w600));
-
-    await pr.show();
-    timer = Timer(Duration(seconds: 3), () async {
-      await pr.hide();
-    });
   }
 
   Future<void> showProgressLoading(bool finish) async {
@@ -439,6 +419,11 @@ class _TakephotoState extends State<Takephoto> {
         numberupload = 0;
       });
     }
+    if (step > 1) {
+      setState(() {
+        documentController.text = tmpTicketNo;
+      });
+    }
   }
 
   void setFocus() {
@@ -451,7 +436,7 @@ class _TakephotoState extends State<Takephoto> {
   Future<void> backMenu() async {
     if (step == 3) {
       setState(() {
-        step--;
+        step = 1;
       });
     } else if (step == 4) {
       if (haveImageSubWorkType) {
@@ -606,7 +591,7 @@ class _TakephotoState extends State<Takephoto> {
       setState(() {
         documentController.text = barcodeScanRes;
       });
-      await documentIDCheck();
+      await getDataDO();
       setVisible();
       setReadOnly();
       setColor();
@@ -617,20 +602,197 @@ class _TakephotoState extends State<Takephoto> {
     }
   }
 
-  Future<void> documentIDCheck() async {
+  DataTable _createDataTable() {
+    return DataTable(
+        headingRowColor: MaterialStateColor.resolveWith(
+          (states) => Colors.grey[200]!,
+        ),
+        columnSpacing: 5,
+        //border: TableBorder.all(width: 1),
+        columns: _createColumns(),
+        rows: _createRows());
+  }
+
+  List<DataColumn> _createColumns() {
+    return [
+      DataColumn(
+          label: Expanded(
+              child: (Text('DO No.',
+                  softWrap: true,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black))))),
+      DataColumn(
+          label: Expanded(
+              child: (Text('WH',
+                  softWrap: true,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black))))),
+      DataColumn(
+          label: Expanded(
+              child: Text('Select',
+                  softWrap: true,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black)))),
+    ];
+  }
+
+  List<DataRow> _createRows() {
+    return listDO
+        .map((listDO) => DataRow(
+                color: MaterialStateColor.resolveWith((states) {
+                  return Colors.transparent; //make tha magic!
+                }),
+                cells: [
+                  DataCell(Container(
+                      width: 70, //SET width
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            listDO.doNumber.toString(),
+                            textAlign: TextAlign.start,
+                          )))),
+                  DataCell(Container(
+                      width: 60, //SET width
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            listDO.wareHouse.toString(),
+                            textAlign: TextAlign.start,
+                          )))),
+                  DataCell(Align(
+                      alignment: Alignment.center,
+                      child: new SizedBox(
+                        width: 50.0,
+                        height: 30.0,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.of(context, rootNavigator: true).pop();
+                            await showProgressLoading(false);
+                            await setPrefsDocumentId(listDO.documentId!);
+                            await documentIDCheck();
+                            setVisible();
+                            setReadOnly();
+                            setColor();
+                            setText();
+                            setFocus();
+                          },
+                          child: Icon(Icons.assignment),
+                          style: ButtonStyle(
+                            minimumSize: MaterialStateProperty.all<Size>(
+                                Size(50, 50)), //////// HERE
+                            backgroundColor: MaterialStateProperty.all<Color>(
+                                Colors.lightBlue),
+                            shape: MaterialStateProperty.all<
+                                RoundedRectangleBorder>(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10.0),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ))),
+                ]))
+        .toList();
+  }
+
+  void showDialogDO() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          //title: Text('Select DO'),
+          content: SingleChildScrollView(
+            child: Container(
+              width: double.infinity,
+              child: Container(
+                decoration:
+                    BoxDecoration(border: Border.all(color: Colors.black)),
+                //height: MediaQuery.of(context).size.height / 2.4,
+                //width: MediaQuery.of(context).size.width / 1.5,
+                child: SingleChildScrollView(
+                    child: Column(children: [
+                  _createDataTable(),
+                ])),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    return;
+  }
+
+  Future<void> getDataDO() async {
     await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
+
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listImageSubWorkTypeMenu.clear();
+        tmpTicketNo = documentController.text.toString();
       });
 
       var url = Uri.parse('https://' +
           configs +
-          '/api/Documents/ValidateDocument/' +
+          '/api/Documents/ValidateDocumentNoList/' +
           documentController.text.toString());
+
+      var headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken
+      };
+
+      http.Response response = await http.get(url, headers: headers);
+      var data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        var datalist =
+            List<ListDo>.from(data.map((model) => ListDo.fromJson(model)));
+
+        setState(() {
+          listDO = datalist;
+        });
+
+        if (listDO.length == 1) {
+          //await showProgressLoading(true);
+          await setPrefsDocumentId(listDO[0].documentId!);
+          await documentIDCheck();
+        } else if (listDO.length > 1) {
+          await showProgressLoading(true);
+          showDialogDO();
+        }
+      } else {
+        await showProgressLoading(true);
+        showErrorDialog(data.toString());
+      }
+    } catch (e) {
+      await showProgressLoading(true);
+      showErrorDialog('Error occured while getDataDO');
+    }
+  }
+
+  Future<void> documentIDCheck() async {
+    //await showProgressLoading(false);
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
+      setState(() {
+        listImageSubWorkTypeMenu.clear();
+      });
+
+      int? docIDtmp = prefs.getInt('documentId');
+
+      var url = Uri.parse('https://' +
+          configs +
+          '/api/Documents/ValidateDocument/' +
+          docIDtmp.toString());
 
       var headers = {
         "Content-Type": "application/json",
@@ -662,7 +824,7 @@ class _TakephotoState extends State<Takephoto> {
           });
         }
 
-        //getListAdvsalDoc
+        //check subworktype
         if (result.imageSubWorkTypeId != null) {
           int index = 0;
 
@@ -682,6 +844,7 @@ class _TakephotoState extends State<Takephoto> {
             haveImageSubWorkType = true;
           });
 
+          //getListAdvsalDoc
           if (result.woImageHeaderListModel!.length > 0) {
             listWoImageList.clear();
             for (int i = 0; i < result.woImageHeaderListModel!.length; i++) {
@@ -732,9 +895,9 @@ class _TakephotoState extends State<Takephoto> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       int documentIdTemp = prefs.getInt('documentId')!;
       int imageSubWorkTypeIdTemp = prefs.getInt('imageSubWorkTypeId')!;
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listLoadTypeMenu.clear();
       });
 
@@ -791,9 +954,9 @@ class _TakephotoState extends State<Takephoto> {
       if (advSaleTemp == "true") {
         woImageHeaderIdTempAdvsale = null;
       }
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listLoadTypeMenu.clear();
       });
       String documentIdTempStr = documentIdTemp.toString();
@@ -922,10 +1085,15 @@ class _TakephotoState extends State<Takephoto> {
           await showProgressLoading(true);
         } else {
           setState(() {
-            step = 1;
+            step--;
+          });
+          await getLoadTypeMenu();
+          setState(() {
+            header3 = '';
+            listVisible2 = false;
           });
           await showProgressLoading(true);
-          showSuccessDialog('Document Completed!');
+          showSuccessDialog('LoadType Completed!');
         }
       } else {
         await showProgressLoading(true);
@@ -964,68 +1132,53 @@ class _TakephotoState extends State<Takephoto> {
         });
       }
     } else {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String showMenu = prefs.getString('showMenu')!;
+      // Original = 1[0%] , Low = 0.25[20%] , Medium = 0.21755 [40%] , High = 0.175[60%]
+      print(showMenu);
+      if (showMenu == 'Original') {
+        setState(() {
+          scaleImg = 30;
+        });
+      } else if (showMenu == 'Low') {
+        setState(() {
+          scaleImg = 15;
+        });
+      } else if (showMenu == 'Medium') {
+        setState(() {
+          scaleImg = 20;
+        });
+      } else if (showMenu == 'High') {
+        setState(() {
+          scaleImg = 25;
+        });
+      }
+
       //open camera device
       PickedFile? selectedImage = await _picker.getImage(
           source: ImageSource.camera,
-          imageQuality: 30,
-          maxHeight: 2000,
-          maxWidth: 2000);
+          imageQuality: scaleImg.toInt(),
+          maxHeight: 1920,
+          maxWidth: 1080);
 
       //set image from camera
       File? temp;
       if (selectedImage != null) {
         temp = File(selectedImage.path);
         if (selectedImage.path.isNotEmpty) {
+          await showProgressLoading(false);
+
           setState(() {
             _image = temp;
             final encodedBytes = _image!.readAsBytesSync();
             fileInBase64 = base64Encode(encodedBytes);
           });
-
-          /* //print size file image
-        double news = fileInBase64.length / (1024 * 1024);
-        print('Base64 : ' + news.toString() + ' MB');
-
-        //print size width, height image
-        var decoded = await decodeImageFromList(_image!.readAsBytesSync());
-        print('Original Width : ' + decoded.width.toString());
-        print('Original Height : ' + decoded.height.toString());
-
-        //resize image
-        img.Image? image = img.decodeImage(temp.readAsBytesSync());
-        var resizedImage = img.copyResize(image!, height: 120, width: 120);
-
-        //Get a path to save the resized file
-        final directory = await getApplicationDocumentsDirectory();
-        String path = directory.path;
-
-        // Save file
-        File resizedFile = File('$path/resizedImage.jpg')
-          ..writeAsBytesSync(img.encodePng(resizedImage));
-
-        //encode image to base64
-        final encodedBytes2 = resizedFile.readAsBytesSync();
-        String fileResizeInBase64 = base64Encode(encodedBytes2);
-
-        //print size file image
-        double news2 = fileResizeInBase64.length / (1024 * 1024);
-        print('Base64 : ' + news2.toString() + ' MB');
-
-        //print size width, height image
-        var decoded2 = await decodeImageFromList(resizedFile.readAsBytesSync());
-        print('Resize Width : ' + decoded2.width.toString());
-        print('Resize Height : ' + decoded2.height.toString());
-
-        setState(() {
-          fileInBase64 = fileResizeInBase64;
-        });*/
         }
+        await showProgressLoading(true);
       }
     }
 
     if (_image != null) {
-      // showProgressImageFromCamera();
-      await showProgressLoading(false);
       setState(() {
         step++;
       });
@@ -1040,13 +1193,13 @@ class _TakephotoState extends State<Takephoto> {
 
     await getDeviceInfo();
 
-    await getLocation();
+    //await getLocation();
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       int woImageDetailIdTemp = prefs.getInt('woImageDetailId')!;
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listLoadTypeMenu.clear();
       });
 
@@ -1164,14 +1317,14 @@ class _TakephotoState extends State<Takephoto> {
 
     await getDeviceInfo();
 
-    await getLocation();
+    //await getLocation();
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       int woImageHeaderIdTemp = prefs.getInt('woImageHeaderId')!;
       int woImageDetailIdTemp = prefs.getInt('woImageDetailId')!;
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listLoadTypeMenu.clear();
       });
 
@@ -1229,7 +1382,7 @@ class _TakephotoState extends State<Takephoto> {
             step--;
             step--;
             _image = null;
-            print(step);
+            //print(step);
           });
         } else if (numberupload < max && numberupload >= min) {
           setState(() {
@@ -1247,7 +1400,7 @@ class _TakephotoState extends State<Takephoto> {
                 max.toString();
             //step++;
             _image = null;
-            print(step);
+            //print(step);
           });
         } else if (numberupload >= max) {
           setState(() {
@@ -1265,7 +1418,7 @@ class _TakephotoState extends State<Takephoto> {
                 max.toString();
             step++;
             _image = null;
-            print(step);
+            //print(step);
           });
         }
 
@@ -1306,14 +1459,14 @@ class _TakephotoState extends State<Takephoto> {
     });
     await showProgressLoading(false);
     await getDeviceInfo();
-    await getLocation();
+    //await getLocation();
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       int woImageHeaderIdTemp = prefs.getInt('woImageHeaderId')!;
       int woImageDetailIdTemp = prefs.getInt('woImageDetailId')!;
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
         listLoadTypeMenu.clear();
       });
 
@@ -1342,7 +1495,12 @@ class _TakephotoState extends State<Takephoto> {
 
       if (response.statusCode == 200) {
         setState(() {
-          step = 1;
+          step = 4;
+        });
+        await getLoadTypeMenu();
+        setState(() {
+          header3 = '';
+          listVisible2 = false;
         });
         await showProgressLoading(true);
         showSuccessDialog('Document Completed');
@@ -1404,7 +1562,7 @@ class _TakephotoState extends State<Takephoto> {
                     readOnly: documentReadonly,
                     textInputAction: TextInputAction.go,
                     onFieldSubmitted: (value) async {
-                      await documentIDCheck();
+                      await getDataDO();
                       setVisible();
                       setReadOnly();
                       setColor();
@@ -1664,7 +1822,9 @@ class _TakephotoState extends State<Takephoto> {
                                   setColor();
                                   setText();
                                   setFocus();
-                                  await showProgressLoading(true);
+                                  print('---Finish Preview Image---');
+                                  print(DateTime.now());
+                                  print('-------');
                                 }
                               : null,
                         )),
@@ -1686,6 +1846,10 @@ class _TakephotoState extends State<Takephoto> {
                                   setColor();
                                   setText();
                                   setFocus();
+                                  print(
+                                      '---Finish Call Function uploadImage---');
+                                  print(DateTime.now());
+                                  print('-------');
                                 }
                               : null,
                         )),

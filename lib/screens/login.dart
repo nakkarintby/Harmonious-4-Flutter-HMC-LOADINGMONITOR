@@ -11,11 +11,6 @@ import 'package:hmc_iload/class/userLoginResult.dart';
 import 'package:hmc_iload/screens/main_screen.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
-// import 'package:passcode_screen/circle.dart';
-// import 'package:passcode_screen/keyboard.dart';
-// import 'package:passcode_screen/passcode_screen.dart';
-// import 'package:location/location.dart';
-// import 'package:hmc_iload/screens/menu.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Login extends StatefulWidget {
@@ -32,26 +27,31 @@ class _LoginState extends State<Login> {
       RoundedLoadingButtonController();
   late Timer timer;
   TextEditingController configsController = TextEditingController();
-  String configs = '';
-  String version = '';
   String urlDownload = '';
+  String version = '1.1';
+  String configs = 'iloadapi.harmonious.co.th';
+  String showMenu = 'Original';
+  String tmpshowMenu = '';
 
   @override
   void initState() {
     super.initState();
-    setSharedPrefs();
     setState(() {
-      version = '1.0';
+      version = '1.1';
+      configs = 'iloadapi.harmonious.co.th';
+      showMenu = 'Original';
     });
+    setSharedPrefs();
     checkVersionAPK();
   }
 
   Future<void> checkVersionAPK() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
+      if (prefs.getString('configs') != null) {
         configs = prefs.getString('configs')!;
-      });
+      }
+
       var url = Uri.parse(
           'https://' + configs + '/api/Documents/CheckVersion/' + version);
 
@@ -99,7 +99,7 @@ class _LoginState extends State<Login> {
                     new TextButton(
                       child: new Text("OK"),
                       onPressed: () {
-                        launchUrlDownload();
+                        launchUrlDownload(urlDownload);
                       },
                     ),
                   ],
@@ -114,27 +114,27 @@ class _LoginState extends State<Login> {
     }
   }
 
-  Future<void> launchUrlDownload() async {
-    if (await launchUrl(urlDownload as Uri)) {
-      await launchUrl(urlDownload as Uri);
+  Future<void> launchUrlDownload(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
     } else {
-      throw 'Could not launch $urlDownload';
+      throw 'Could not launch $url';
     }
   }
 
   Future<void> setSharedPrefs() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool checkConfigsPrefs = prefs.containsKey('configs');
+    bool checkshowMenuoPrefs = prefs.containsKey('showMenu');
 
-    if (checkConfigsPrefs) {
-      setState(() {
-        configs = prefs.getString('configs')!;
-      });
+    if (checkConfigsPrefs && checkshowMenuoPrefs) {
+      configs = prefs.getString('configs')!;
+      showMenu = prefs.getString('showMenu')!;
     } else {
-      prefs.setString('configs', 'iloadapi.harmonious.co.th');
-      setState(() {
-        configs = prefs.getString('configs')!;
-      });
+      await prefs.setString('configs', 'iloadapi.harmonious.co.th');
+      await prefs.setString('showMenu', 'Original');
+      configs = prefs.getString('configs')!;
+      showMenu = prefs.getString('showMenu')!;
     }
   }
 
@@ -175,7 +175,7 @@ class _LoginState extends State<Login> {
 
   Future<void> setPrefsConfigs(String configs) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString('configs', configs);
+    await prefs.setString('configs', configs);
   }
 
   void showErrorDialog(String error) {
@@ -209,18 +209,13 @@ class _LoginState extends State<Login> {
   }
 
   Future<void> checkLogin() async {
-    //await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
+
+      if (prefs.getString('configs') != null) {
         configs = prefs.getString('configs')!;
-      });
+      }
       var url = Uri.parse('https://' + configs + '/api/User/Login');
-      /*var headers = { 
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Authorization": "Bearer " + accessToken
-      };*/
       var headers = {'Content-Type': 'application/json'};
       late UserLogin? userDataLogin = new UserLogin();
       setState(() {
@@ -231,6 +226,19 @@ class _LoginState extends State<Login> {
         userDataLogin.rememberLogin = true;
         userDataLogin.returnUrl = '1';
       });
+
+      bool checkConfigsPrefs = prefs.containsKey('configs');
+      bool checkshowMenuoPrefs = prefs.containsKey('showMenu');
+
+      if (checkConfigsPrefs && checkshowMenuoPrefs) {
+        configs = prefs.getString('configs')!;
+        showMenu = prefs.getString('showMenu')!;
+      } else {
+        await prefs.setString('configs', 'iloadapi.harmonious.co.th');
+        await prefs.setString('showMenu', 'Original');
+        configs = prefs.getString('configs')!;
+        showMenu = prefs.getString('showMenu')!;
+      }
 
       var jsonBody = jsonEncode(userDataLogin);
       final encoding = Encoding.getByName('utf-8');
@@ -248,7 +256,8 @@ class _LoginState extends State<Login> {
         setState(() {
           result = UserLoginResult.fromJson(data);
         });
-        prefs.setString('token', result.accesstoken!);
+
+        await prefs.setString('token', result.accesstoken!);
         setState(() {
           usernameController.text = '';
           passwordController.text = '';
@@ -257,7 +266,7 @@ class _LoginState extends State<Login> {
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (context) => MainScreen()));
       } else {
-        prefs.setString('token', '');
+        await prefs.setString('token', '');
         setState(() {
           usernameController.text = '';
           passwordController.text = '';
@@ -266,7 +275,6 @@ class _LoginState extends State<Login> {
         showErrorDialog('Username or Password incorrect.');
       }
     } catch (e) {
-      //await showProgressLoading(true);
       setState(() {
         usernameController.text = '';
         passwordController.text = '';
@@ -279,7 +287,15 @@ class _LoginState extends State<Login> {
   Future<void> editConfigs() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     Icon icon = Icon(Icons.edit, color: Colors.lightBlue);
-
+    setState(() {
+      tmpshowMenu = showMenu;
+    });
+    if (prefs.getString('configs') != null) {
+      configs = prefs.getString('configs')!;
+    }
+    setState(() {
+      configsController..text = configs;
+    });
     showDialog(
         context: context,
         builder: (context) {
@@ -291,18 +307,45 @@ class _LoginState extends State<Login> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 TextFormField(
-                  //focusNode: focusNodes[3],
-                  //autofocus: true, //set initail focus on dialog
-                  //keyboardType: TextInputType.number,
                   readOnly: false,
-                  controller: configsController
-                    ..text = prefs.getString('configs').toString(),
+                  controller: configsController,
                   decoration: InputDecoration(
                       labelText: 'Configs', hintText: "Enter Url"),
                   textInputAction: TextInputAction.next,
-                  onEditingComplete: () async {
-                    var temp = prefs.getString('configs').toString();
-                    await setPrefsConfigs(temp);
+                  onEditingComplete: () async {},
+                ),
+                SizedBox(
+                  height: 20,
+                ),
+                Text(
+                  'Quality Images ',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.start,
+                ),
+                SizedBox(
+                  height: 5,
+                ),
+                new DropdownButton<String>(
+                  isDense: true,
+                  isExpanded: true,
+                  value: showMenu,
+                  items: <String>['Original', 'Low', 'Medium', 'High']
+                      .map((String value) {
+                    return new DropdownMenuItem<String>(
+                      value: value,
+                      child: new Text(value),
+                    );
+                  }).toList(),
+                  onTap: () {
+                    FocusScope.of(context).requestFocus(new FocusNode());
+                  },
+                  onChanged: (String? val) {
+                    setState(() {
+                      showMenu = val!;
+                    });
                   },
                 ),
               ],
@@ -316,8 +359,9 @@ class _LoginState extends State<Login> {
                 child: Text('Cancel'),
                 onPressed: () {
                   setState(() {
-                    Navigator.pop(context);
+                    showMenu = tmpshowMenu;
                   });
+                  Navigator.pop(context);
                 },
               ),
               TextButton(
@@ -327,11 +371,13 @@ class _LoginState extends State<Login> {
                   foregroundColor: Colors.white,
                 ),
                 child: Text('Save'),
-                onPressed: () {
+                onPressed: () async {
+                  await prefs.setString('configs', configsController.text);
+                  await prefs.setString('showMenu', showMenu);
                   setState(() {
-                    prefs.setString('configs', configsController.text);
-                    Navigator.pop(context);
+                    configs = configsController.text;
                   });
+                  Navigator.pop(context);
                   alertDialog('Edit Successful', 'Success');
                 },
               ),
@@ -371,16 +417,14 @@ class _LoginState extends State<Login> {
         alignment: Alignment.center,
         children: <Widget>[
           Positioned(
-            //top: MediaQuery.of(context).size.height / 1.135,
             right: MediaQuery.of(context).size.width / 2.5,
             child: Image.asset("assets/shms1.png", width: size.width * 0.38),
           ),
           Positioned(
-            //top: MediaQuery.of(context).size.height / 1.135,
             right: MediaQuery.of(context).size.width / 80,
             child: ElevatedButton(
               onPressed: () {},
-              child: Text('1.0'),
+              child: Text('1.1'),
               style: ElevatedButton.styleFrom(
                 primary: Colors.red[400], //
                 shape: CircleBorder(),
@@ -408,8 +452,6 @@ class _LoginState extends State<Login> {
         visible: true,
         child: SizedBox(
             child: TextFormField(
-          //keyboardType: TextInputType.number,
-          //maxLength: 10,
           controller: usernameController,
           style: TextStyle(
             fontSize: 14,
@@ -432,13 +474,6 @@ class _LoginState extends State<Login> {
                 borderRadius: BorderRadius.circular(10)),
             prefix: Padding(
               padding: const EdgeInsetsDirectional.only(start: 12.0),
-              /*child: Text(
-                '(+66)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),*/
             ),
           ),
         )));
@@ -448,8 +483,6 @@ class _LoginState extends State<Login> {
     return Visibility(
         visible: true,
         child: TextFormField(
-          //keyboardType: TextInputType.number,
-          //maxLength: 10,
           obscureText: true,
           controller: passwordController,
           style: TextStyle(
@@ -464,10 +497,7 @@ class _LoginState extends State<Login> {
                   width: 1,
                   height: 1,
                 )),
-            // prefixIcon: Icon(Icons.person),
-
             hintText: 'Password',
-            //labelText: 'Password',
             enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: Colors.black12),
                 borderRadius: BorderRadius.circular(10)),
@@ -476,13 +506,6 @@ class _LoginState extends State<Login> {
                 borderRadius: BorderRadius.circular(10)),
             prefix: Padding(
               padding: EdgeInsets.symmetric(horizontal: 6),
-              /*child: Text(
-                '(+66)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),*/
             ),
           ),
         ));
@@ -501,7 +524,6 @@ class _LoginState extends State<Login> {
             color: Colors.blue.shade300,
             successColor: Color(0xfffbb448).withAlpha(100),
             controller: _btnController,
-            //onPressed: () => await checkLogin(),
             onPressed: () async {
               await checkLogin();
             },
@@ -520,7 +542,6 @@ class _LoginState extends State<Login> {
         alignment: Alignment.center,
         children: <Widget>[
           Positioned(
-            //top: MediaQuery.of(context).size.height / 1.135,
             right: MediaQuery.of(context).size.width / 4,
             child: ElevatedButton(
               onPressed: () {

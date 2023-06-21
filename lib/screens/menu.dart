@@ -50,23 +50,6 @@ class _MenuPageState extends State<Menu> {
                   },
                 ),
               ),
-              /* Visibility(
-                visible: containerVisible,
-                child: MenuList2(
-                  text: "Take Photo",
-                  imageIcon: Image.asset(
-                    "assets/takephoto.gif",
-                    width: 65,
-                    height: 55,
-                  ),
-                  press: () => {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => PreviewCheckSheet2()))
-                  },
-                ),
-              ),*/
               Visibility(
                 visible: containerVisible,
                 child: MenuList2(

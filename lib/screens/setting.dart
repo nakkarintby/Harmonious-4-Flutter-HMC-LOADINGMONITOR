@@ -60,18 +60,6 @@ class Setting extends StatelessWidget {
                 ),
                 press: () => {logoutDialog()},
               )
-
-              /*SettingMenu(
-                text: "Log Out",
-                icon: Icon(
-                  Icons.logout_rounded,
-                  size: 40,
-                  color: Colors.blue,
-                ),
-                press: () {
-                  logoutDialog();
-                },
-              ),*/
             ],
           ),
         ),

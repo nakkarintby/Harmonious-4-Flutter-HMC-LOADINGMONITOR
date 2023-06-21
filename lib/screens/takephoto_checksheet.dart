@@ -68,11 +68,12 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
   int max = 0;
   int numberupload = 0;
   int woCheckSheetHeaderId = 0;
+  double scaleImg = 0;
 
   @override
   void initState() {
     super.initState();
-    getLocation();
+    //getLocation();
     getDeviceInfo();
     setState(() {
       step = 1;
@@ -84,12 +85,10 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
   Future<void> getDataImageDetailCheckSheet() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        dwto = prefs.getString('dwto')!;
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-        woCheckSheetHeaderId = prefs.getInt('woCheckSheetHeaderId')!;
-      });
+      dwto = prefs.getString('dwto')!;
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
+      woCheckSheetHeaderId = prefs.getInt('woCheckSheetHeaderId')!;
 
       var url = Uri.parse('https://' +
           configs +
@@ -185,10 +184,6 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     }
 
     _currentPosition = await location.getLocation();
-    /*print('' +
-        _currentPosition!.latitude.toString() +
-        ',' +
-        _currentPosition!.longitude.toString());*/
     setState(() {
       gps = (_currentPosition!.latitude.toString() +
           ',' +
@@ -217,50 +212,7 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     }
   }
 
-  Future<void> showProgressImageFromCamera() async {
-    ProgressDialog pr = ProgressDialog(context);
-    pr = ProgressDialog(context,
-        type: ProgressDialogType.normal, isDismissible: true, showLogs: true);
-    pr.style(
-        progress: 50.0,
-        message: "Please wait...",
-        progressWidget: Container(
-            padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()),
-        maxProgress: 100.0,
-        progressTextStyle: TextStyle(
-            color: Colors.black, fontSize: 13.0, fontWeight: FontWeight.w400),
-        messageTextStyle: TextStyle(
-            color: Colors.black, fontSize: 19.0, fontWeight: FontWeight.w600));
-
-    await pr.show();
-    timer = Timer(Duration(seconds: 3), () async {
-      await pr.hide();
-    });
-  }
-
   Future<void> showProgressLoading(bool finish) async {
-    ProgressDialog pr = ProgressDialog(context);
-    pr = ProgressDialog(context,
-        type: ProgressDialogType.normal, isDismissible: true, showLogs: true);
-    pr.style(
-        progress: 50.0,
-        message: "Please wait...",
-        progressWidget: Container(
-            padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()),
-        maxProgress: 100.0,
-        progressTextStyle: TextStyle(
-            color: Colors.black, fontSize: 13.0, fontWeight: FontWeight.w400),
-        messageTextStyle: TextStyle(
-            color: Colors.black, fontSize: 19.0, fontWeight: FontWeight.w600));
-
-    if (finish == false) {
-      await pr.show();
-    } else {
-      await pr.hide();
-    }
-  }
-
-  Future<void> showProgressLoadingUpload(bool finish) async {
     if (finish == false) {
       showDialog(
           // The user CANNOT close this dialog  by pressing outsite it
@@ -504,67 +456,52 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
         });
       }
     } else {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String showMenu = prefs.getString('showMenu')!;
+      // Original = 1[0%] , Low = 0.25[20%] , Medium = 0.21755 [40%] , High = 0.175[60%]
+      if (showMenu == 'Original') {
+        setState(() {
+          scaleImg = 30;
+        });
+      } else if (showMenu == 'Low') {
+        setState(() {
+          scaleImg = 15;
+        });
+      } else if (showMenu == 'Medium') {
+        setState(() {
+          scaleImg = 20;
+        });
+      } else if (showMenu == 'High') {
+        setState(() {
+          scaleImg = 25;
+        });
+      }
+
       //open camera device
       PickedFile? selectedImage = await _picker.getImage(
           source: ImageSource.camera,
-          imageQuality: 30,
-          maxHeight: 2000,
-          maxWidth: 2000);
+          imageQuality: scaleImg.toInt(),
+          maxHeight: 1920,
+          maxWidth: 1080);
 
       //set image from camera
       File? temp;
       if (selectedImage != null) {
         temp = File(selectedImage.path);
         if (selectedImage.path.isNotEmpty) {
+          await showProgressLoading(false);
+
           setState(() {
             _image = temp;
             final encodedBytes = _image!.readAsBytesSync();
             fileInBase64 = base64Encode(encodedBytes);
           });
-
-          /* //print size file image
-        double news = fileInBase64.length / (1024 * 1024);
-        print('Base64 : ' + news.toString() + ' MB');
-
-        //print size width, height image
-        var decoded = await decodeImageFromList(_image!.readAsBytesSync());
-        print('Original Width : ' + decoded.width.toString());
-        print('Original Height : ' + decoded.height.toString());
-
-        //resize image
-        img.Image? image = img.decodeImage(temp.readAsBytesSync());
-        var resizedImage = img.copyResize(image!, height: 120, width: 120);
-
-        //Get a path to save the resized file
-        final directory = await getApplicationDocumentsDirectory();
-        String path = directory.path;
-
-        // Save file
-        File resizedFile = File('$path/resizedImage.jpg')
-          ..writeAsBytesSync(img.encodePng(resizedImage));
-
-        //encode image to base64
-        final encodedBytes2 = resizedFile.readAsBytesSync();
-        String fileResizeInBase64 = base64Encode(encodedBytes2);
-
-        //print size file image
-        double news2 = fileResizeInBase64.length / (1024 * 1024);
-        print('Base64 : ' + news2.toString() + ' MB');
-
-        //print size width, height image
-        var decoded2 = await decodeImageFromList(resizedFile.readAsBytesSync());
-        print('Resize Width : ' + decoded2.width.toString());
-        print('Resize Height : ' + decoded2.height.toString());
-
-        setState(() {
-          fileInBase64 = fileResizeInBase64;
-        });*/
         }
+        await showProgressLoading(true);
       }
     }
+
     if (_image != null) {
-      // showProgressImageFromCamera();
-      await showProgressLoading(false);
       setState(() {
         step++;
       });
@@ -575,15 +512,13 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     setState(() {
       uploadEnabled = false;
     });
-    await showProgressLoadingUpload(false);
+    await showProgressLoading(false);
     await getDeviceInfo();
-    await getLocation();
+    //await getLocation();
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-      });
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
 
       var url = Uri.parse('https://' +
           configs +
@@ -661,7 +596,7 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
             _image = null;
           });
         }
-        await showProgressLoadingUpload(true);
+        await showProgressLoading(true);
       } else if (response.statusCode == 404) {
         int tmp = numberupload + 1;
         setState(() {
@@ -673,9 +608,9 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
           step++;
           _image = null;
         });
-        await showProgressLoadingUpload(true);
+        await showProgressLoading(true);
       } else {
-        await showProgressLoadingUpload(true);
+        await showProgressLoading(true);
         showErrorDialog('uploadImage Error!');
       }
     } catch (e) {
@@ -690,13 +625,11 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     });
     await showProgressLoading(false);
     await getDeviceInfo();
-    await getLocation();
+    //await getLocation();
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-      });
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
 
       var url = Uri.parse('https://' +
           configs +
@@ -840,7 +773,6 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
                                   setReadOnly();
                                   setColor();
                                   setText();
-                                  await showProgressLoading(true);
                                 }
                               : null,
                         )),

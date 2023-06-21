@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:hmc_iload/class/listdo.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -43,6 +44,8 @@ class _CheckSheetState extends State<CheckSheet> {
   bool createEnabled = false;
 
   late List<FocusNode> focusNodes = List.generate(1, (index) => FocusNode());
+  List<ListDo> listDO = [];
+  String tmpTicketNo = '';
 
   @override
   void initState() {
@@ -115,6 +118,11 @@ class _CheckSheetState extends State<CheckSheet> {
     if (step == 1) {
       setState(() {
         documentController.text = '';
+      });
+    }
+    if (step > 1) {
+      setState(() {
+        documentController.text = tmpTicketNo;
       });
     }
   }
@@ -235,7 +243,7 @@ class _CheckSheetState extends State<CheckSheet> {
       setState(() {
         documentController.text = barcodeScanRes;
       });
-      await documentIDCheck();
+      await getDataDO();
       setVisible();
       setReadOnly();
       setColor();
@@ -246,20 +254,186 @@ class _CheckSheetState extends State<CheckSheet> {
     }
   }
 
-  Future<void> documentIDCheck() async {
+  DataTable _createDataTable() {
+    return DataTable(
+        headingRowColor: MaterialStateColor.resolveWith(
+          (states) => Colors.grey[200]!,
+        ),
+        columnSpacing: 5,
+        columns: _createColumns(),
+        rows: _createRows());
+  }
+
+  List<DataColumn> _createColumns() {
+    return [
+      DataColumn(
+          label: Expanded(
+              child: (Text('Do No.',
+                  softWrap: true,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black))))),
+      DataColumn(
+          label: Expanded(
+              child: (Text('WH',
+                  softWrap: true,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black))))),
+      DataColumn(
+          label: Expanded(
+              child: Text('Select',
+                  softWrap: true,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black)))),
+    ];
+  }
+
+  List<DataRow> _createRows() {
+    return listDO
+        .map((listDO) => DataRow(
+                color: MaterialStateColor.resolveWith((states) {
+                  return Colors.transparent; //make tha magic!
+                }),
+                cells: [
+                  DataCell(Container(
+                      width: 70, //SET width
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            listDO.doNumber.toString(),
+                            textAlign: TextAlign.start,
+                          )))),
+                  DataCell(Container(
+                      width: 60, //SET width
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            listDO.wareHouse.toString(),
+                            textAlign: TextAlign.start,
+                          )))),
+                  DataCell(Align(
+                      alignment: Alignment.center,
+                      child: new SizedBox(
+                        width: 50.0,
+                        height: 30.0,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.of(context, rootNavigator: true).pop();
+                            await showProgressLoading(false);
+                            await setPrefsDocumentId(listDO.documentId!);
+                            await documentIDCheck();
+                            setVisible();
+                            setReadOnly();
+                            setColor();
+                            setText();
+                            setFocus();
+                          },
+                          child: Icon(Icons.assignment),
+                          style: ButtonStyle(
+                            minimumSize: MaterialStateProperty.all<Size>(
+                                Size(50, 50)), //////// HERE
+                            backgroundColor: MaterialStateProperty.all<Color>(
+                                Colors.lightBlue),
+                            shape: MaterialStateProperty.all<
+                                RoundedRectangleBorder>(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10.0),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ))),
+                ]))
+        .toList();
+  }
+
+  void showDialogDO() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          content: SingleChildScrollView(
+            child: Container(
+              width: double.infinity,
+              child: Container(
+                decoration:
+                    BoxDecoration(border: Border.all(color: Colors.black)),
+                child: SingleChildScrollView(
+                    child: Column(children: [
+                  _createDataTable(),
+                ])),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    return;
+  }
+
+  Future<void> getDataDO() async {
     await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
       setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-        //documentController.text = 'WO7';
+        tmpTicketNo = documentController.text.toString();
       });
 
       var url = Uri.parse('https://' +
           configs +
-          '/api/Documents/ValidateDocumentCheckSheet/' +
+          '/api/Documents/ValidateDocumentNoListCheckSheet/' +
           documentController.text.toString());
+
+      var headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken
+      };
+
+      http.Response response = await http.get(url, headers: headers);
+      var data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        var datalist =
+            List<ListDo>.from(data.map((model) => ListDo.fromJson(model)));
+
+        setState(() {
+          listDO = datalist;
+        });
+
+        if (listDO.length == 1) {
+          await setPrefsDocumentId(listDO[0].documentId!);
+          await documentIDCheck();
+        } else if (listDO.length > 1) {
+          await showProgressLoading(true);
+          showDialogDO();
+        }
+      } else {
+        await showProgressLoading(true);
+        showErrorDialog(data.toString());
+      }
+    } catch (e) {
+      await showProgressLoading(true);
+      showErrorDialog('Error occured while getDataDO');
+    }
+  }
+
+  Future<void> documentIDCheck() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
+
+      int? docIDtmp = prefs.getInt('documentId');
+
+      var url = Uri.parse('https://' +
+          configs +
+          '/api/Documents/ValidateDocumentCheckSheet/' +
+          docIDtmp.toString());
 
       var headers = {
         "Content-Type": "application/json",
@@ -313,10 +487,8 @@ class _CheckSheetState extends State<CheckSheet> {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       int documentIdTemp = prefs.getInt('documentId')!;
-      setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-      });
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
 
       var strWocheckSheet = woCheckSheetHeaderId == null
           ? ""
@@ -385,10 +557,8 @@ class _CheckSheetState extends State<CheckSheet> {
     await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-      });
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
 
       var url = Uri.parse('https://' +
           configs +
@@ -472,10 +642,8 @@ class _CheckSheetState extends State<CheckSheet> {
     await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        configs = prefs.getString('configs')!;
-        accessToken = prefs.getString('token')!;
-      });
+      configs = prefs.getString('configs')!;
+      accessToken = prefs.getString('token')!;
 
       var url = Uri.parse('https://' +
           configs +
@@ -654,7 +822,7 @@ class _CheckSheetState extends State<CheckSheet> {
                     readOnly: documentReadonly,
                     textInputAction: TextInputAction.go,
                     onFieldSubmitted: (value) async {
-                      await documentIDCheck();
+                      await getDataDO();
                       setVisible();
                       setReadOnly();
                       setColor();
@@ -756,9 +924,6 @@ class _CheckSheetState extends State<CheckSheet> {
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: <Widget>[
-                    /*SizedBox(
-                      height: MediaQuery.of(context).size.height / 20,
-                    ),*/
                     SizedBox(
                         width: MediaQuery.of(context).size.width / 1.25,
                         child: Text(

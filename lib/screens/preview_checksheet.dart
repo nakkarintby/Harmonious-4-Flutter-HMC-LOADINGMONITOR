@@ -46,7 +46,6 @@ class _PreviewCheckSheetState extends State<PreviewCheckSheet> {
     await showProgressLoading(false);
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-
       configs = prefs.getString('configs')!;
       accessToken = prefs.getString('token')!;
       woCheckSheetHeaderId = prefs.getInt('woCheckSheetHeaderId')!;
@@ -483,17 +482,6 @@ class _PreviewCheckSheetState extends State<PreviewCheckSheet> {
         //border: TableBorder.all(width: 1),
         columns: _createColumns(),
         rows: _createRows());
-    /*dividerThickness: 5,
-        dataRowHeight: 20,
-        showBottomBorder: true,
-        headingTextStyle:
-            TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        headingRowColor:
-            MaterialStateProperty.resolveWith((states) => Colors.black));*/
-    /*border: TableBorder.all(
-          width: 1.0,
-          color: Colors.black,
-        ));*/
   }
 
   List<DataColumn> _createColumns() {
@@ -512,13 +500,6 @@ class _PreviewCheckSheetState extends State<PreviewCheckSheet> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontWeight: FontWeight.bold, color: Colors.black)))),
-      /*  DataColumn(
-          label: Expanded(
-              child: (Text('Description',
-                  softWrap: true,
-                  textAlign: TextAlign.start,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.black))))),*/
       DataColumn(
           label: Expanded(
               child: Text('Detail',
@@ -564,19 +545,6 @@ class _PreviewCheckSheetState extends State<PreviewCheckSheet> {
                               size: 30.0,
                             )),
                   ),
-                  /* DataCell(Align(
-                      alignment: Alignment.centerLeft,
-                      child: SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Container(
-                              width: MediaQuery.of(context).size.width / 1.75,
-                              child: Text(
-                                _data.detail.toString(),
-                                overflow: TextOverflow.visible,
-                                softWrap: true,
-                                textAlign: TextAlign.start,
-                              ))))),*/
-
                   DataCell(Align(
                       alignment: Alignment.center,
                       child: new SizedBox(
