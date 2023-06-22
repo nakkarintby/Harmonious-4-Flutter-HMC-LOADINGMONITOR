@@ -1135,7 +1135,6 @@ class _TakephotoState extends State<Takephoto> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String showMenu = prefs.getString('showMenu')!;
       // Original = 1[0%] , Low = 0.25[20%] , Medium = 0.21755 [40%] , High = 0.175[60%]
-      print(showMenu);
       if (showMenu == 'Original') {
         setState(() {
           scaleImg = 30;

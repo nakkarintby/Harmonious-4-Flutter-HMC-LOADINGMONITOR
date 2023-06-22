@@ -85,7 +85,7 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
   Future<void> getDataImageDetailCheckSheet() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      dwto = prefs.getString('dwto')!;
+      dwto = prefs.getString('Tck')!;
       configs = prefs.getString('configs')!;
       accessToken = prefs.getString('token')!;
       woCheckSheetHeaderId = prefs.getInt('woCheckSheetHeaderId')!;
@@ -184,6 +184,10 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     }
 
     _currentPosition = await location.getLocation();
+    /*print('' +
+        _currentPosition!.latitude.toString() +
+        ',' +
+        _currentPosition!.longitude.toString());*/
     setState(() {
       gps = (_currentPosition!.latitude.toString() +
           ',' +
@@ -212,7 +216,50 @@ class _TakephotoCheckSheetState extends State<TakephotoCheckSheet> {
     }
   }
 
+  Future<void> showProgressImageFromCamera() async {
+    ProgressDialog pr = ProgressDialog(context);
+    pr = ProgressDialog(context,
+        type: ProgressDialogType.normal, isDismissible: true, showLogs: true);
+    pr.style(
+        progress: 50.0,
+        message: "Please wait...",
+        progressWidget: Container(
+            padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()),
+        maxProgress: 100.0,
+        progressTextStyle: TextStyle(
+            color: Colors.black, fontSize: 13.0, fontWeight: FontWeight.w400),
+        messageTextStyle: TextStyle(
+            color: Colors.black, fontSize: 19.0, fontWeight: FontWeight.w600));
+
+    await pr.show();
+    timer = Timer(Duration(seconds: 3), () async {
+      await pr.hide();
+    });
+  }
+
   Future<void> showProgressLoading(bool finish) async {
+    ProgressDialog pr = ProgressDialog(context);
+    pr = ProgressDialog(context,
+        type: ProgressDialogType.normal, isDismissible: true, showLogs: true);
+    pr.style(
+        progress: 50.0,
+        message: "Please wait...",
+        progressWidget: Container(
+            padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()),
+        maxProgress: 100.0,
+        progressTextStyle: TextStyle(
+            color: Colors.black, fontSize: 13.0, fontWeight: FontWeight.w400),
+        messageTextStyle: TextStyle(
+            color: Colors.black, fontSize: 19.0, fontWeight: FontWeight.w600));
+
+    if (finish == false) {
+      await pr.show();
+    } else {
+      await pr.hide();
+    }
+  }
+
+  Future<void> showProgressLoadingUpload(bool finish) async {
     if (finish == false) {
       showDialog(
           // The user CANNOT close this dialog  by pressing outsite it

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hmc_iload/screens/menu.dart';
 import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -176,7 +177,7 @@ class _PreviewCheckSheetState extends State<PreviewCheckSheet> {
           setState(() {
             nextEnable = true;
           });
-          await Navigator.push(context,
+          Navigator.push(context,
               MaterialPageRoute(builder: (context) => TakephotoCheckSheet()));
         } else {
           await showProgressLoading(true);

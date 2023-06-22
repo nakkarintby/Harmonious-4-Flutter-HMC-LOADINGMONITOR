@@ -379,6 +379,7 @@ class _CheckSheetState extends State<CheckSheet> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       configs = prefs.getString('configs')!;
       accessToken = prefs.getString('token')!;
+      prefs.setString('Tck', documentController.text);
       setState(() {
         tmpTicketNo = documentController.text.toString();
       });
